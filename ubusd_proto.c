@@ -190,15 +190,27 @@ static int ubus_client_cmd_queue_add(struct ubus_client *cl,
 					struct ubus_msg_buf *msg,
 					struct ubus_object *obj)
 {
-	struct ubus_client_cmd *cmd = malloc(sizeof(*cmd));
+	struct ubus_client_cmd *cmd = calloc(1, sizeof(*cmd));
 
-	if (cmd) {
-		cmd->msg = msg;
-		cmd->obj = obj;
-		list_add_tail(&cmd->list, &cl->cmd_queue);
-		return -2;
+	if (!cmd)
+		return UBUS_STATUS_UNKNOWN_ERROR;
+
+	/*
+	 * Remember the resume position by path key rather than object pointer.
+	 * The object may be freed (client disconnect or removal) before the
+	 * queued lookup is resumed; a stored pointer would then dangle.
+	 */
+	if (obj) {
+		cmd->lookup_path = strdup(obj->path.key);
+		if (!cmd->lookup_path) {
+			free(cmd);
+			return UBUS_STATUS_UNKNOWN_ERROR;
+		}
 	}
-	return UBUS_STATUS_UNKNOWN_ERROR;
+
+	cmd->msg = msg;
+	list_add_tail(&cmd->list, &cl->cmd_queue);
+	return -2;
 }
 
 static int __ubusd_handle_lookup(struct ubus_client *cl,
@@ -212,12 +224,17 @@ static int __ubusd_handle_lookup(struct ubus_client *cl,
 	size_t len;
 
 	if (!attr[UBUS_ATTR_OBJPATH]) {
-		if (cmd)
-			obj = cmd->obj;
-
-		/* Start from beginning or continue from the last object */
-		if (obj == NULL)
+		/* Start from beginning or continue from the last position */
+		if (cmd && cmd->lookup_path) {
+			/* resume at or after the stored key, skipping freed objects */
+			obj = avl_find_ge_element(&path, cmd->lookup_path, obj, path);
+			if (!obj)
+				return 0;
+		} else {
+			if (avl_is_empty(&path))
+				return 0;
 			obj = avl_first_element(&path, obj, path);
+		}
 
 		avl_for_element_range(obj, avl_last_element(&path, obj, path), obj, path) {
 			/* Keep sending objects until buffering starts */
@@ -230,7 +247,8 @@ static int __ubusd_handle_lookup(struct ubus_client *cl,
 				if (cmd == NULL) {
 					ret = ubus_client_cmd_queue_add(cl, ub, obj);
 				} else {
-					cmd->obj = obj;
+					free(cmd->lookup_path);
+					cmd->lookup_path = strdup(obj->path.key);
 					ret = -2;
 				}
 				return ret;

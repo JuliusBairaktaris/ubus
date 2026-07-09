@@ -48,6 +48,7 @@ static void ubus_client_cmd_free(struct ubus_client_cmd *cmd)
 {
 	list_del(&cmd->list);
 	ubus_msg_free(cmd->msg);
+	free(cmd->lookup_path);
 	free(cmd);
 }
 

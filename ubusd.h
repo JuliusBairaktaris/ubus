@@ -45,7 +45,7 @@ struct ubus_msg_buf_list {
 struct ubus_client_cmd {
 	struct list_head list;
 	struct ubus_msg_buf *msg;
-	struct ubus_object *obj;
+	char *lookup_path;
 };
 
 struct ubus_client {
