@@ -20,11 +20,18 @@
 
 #include "ubusd.h"
 
+static void ubus_client_cmd_free(struct ubus_client_cmd *cmd);
+
 static void handle_client_disconnect(struct ubus_client *cl)
 {
 	struct ubus_msg_buf_list *ubl, *ubl2;
+	struct ubus_client_cmd *cmd, *cmd2;
+
 	list_for_each_entry_safe(ubl, ubl2, &cl->tx_queue, list)
 		ubus_msg_list_free(ubl);
+
+	list_for_each_entry_safe(cmd, cmd2, &cl->cmd_queue, list)
+		ubus_client_cmd_free(cmd);
 
 	ubusd_monitor_disconnect(cl);
 	ubusd_proto_free_client(cl);
