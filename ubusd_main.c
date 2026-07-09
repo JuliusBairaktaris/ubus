@@ -30,6 +30,8 @@ static void handle_client_disconnect(struct ubus_client *cl)
 	ubusd_proto_free_client(cl);
 	if (cl->pending_msg_fd >= 0)
 		close(cl->pending_msg_fd);
+	if (cl->pending_msg)
+		ubus_msg_free(cl->pending_msg);
 	uloop_fd_delete(&cl->sock);
 	close(cl->sock.fd);
 	free(cl);
