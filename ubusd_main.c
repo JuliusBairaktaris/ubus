@@ -177,6 +177,15 @@ retry:
 
 	ub = cl->pending_msg;
 	if (ub) {
+		/*
+		 * offset and len derive from client-controlled input, but the
+		 * read stays within bounds: ub->data was allocated with exactly
+		 * blob_raw_len(ub->data) bytes (already capped at UBUS_MAX_MSGLEN
+		 * when the header was received), and offset only grows until it
+		 * reaches that total, at which point the message is accepted and
+		 * pending_msg is reset below. So offset <= blob_raw_len(ub->data)
+		 * and offset + len never exceed the allocation.
+		 */
 		int offset = cl->pending_msg_offset - sizeof(ub->hdr);
 		int len = blob_raw_len(ub->data) - offset;
 		int bytes = 0;
