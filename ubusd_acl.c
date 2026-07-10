@@ -522,6 +522,7 @@ ubusd_acl_load_file(const char *filename)
 {
 	struct ubusd_acl_file *file;
 	void *blob;
+	char *name;
 
 	blob_buf_init(&bbuf, 0);
 	if (!blobmsg_add_json_from_file(&bbuf, filename)) {
@@ -529,7 +530,12 @@ ubusd_acl_load_file(const char *filename)
 		return -1;
 	}
 
-	file = calloc_a(sizeof(*file), &blob, blob_raw_len(bbuf.head));
+	/*
+	 * The vlist key must stay valid for the node's lifetime; filename
+	 * points into the glob result freed by the caller, so keep a copy.
+	 */
+	file = calloc_a(sizeof(*file), &blob, blob_raw_len(bbuf.head),
+			&name, strlen(filename) + 1);
 	if (!file)
 		return -1;
 
@@ -538,7 +544,7 @@ ubusd_acl_load_file(const char *filename)
 	memcpy(blob, bbuf.head, blob_raw_len(bbuf.head));
 	INIT_LIST_HEAD(&file->acl);
 
-	vlist_add(&ubusd_acl_files, &file->avl, filename);
+	vlist_add(&ubusd_acl_files, &file->avl, strcpy(name, filename));
 	syslog(LOG_INFO, "loading %s\n", filename);
 
 	return 0;
