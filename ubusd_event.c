@@ -102,7 +102,7 @@ static int ubusd_alloc_event_pattern(struct ubus_client *cl, struct blob_attr *m
 
 	ev = calloc(1, sizeof(*ev) + len + 1);
 	if (!ev)
-		return UBUS_STATUS_NO_DATA;
+		return UBUS_STATUS_NO_MEMORY;
 
 	list_add(&ev->list, &obj->events);
 	ev->obj = obj;
