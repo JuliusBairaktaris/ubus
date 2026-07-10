@@ -146,32 +146,34 @@ void ubus_msg_list_free(struct ubus_msg_buf_list *ubl)
 	free(ubl);
 }
 
-static void ubus_msg_enqueue(struct ubus_client *cl, struct ubus_msg_buf *ub)
+static bool ubus_msg_enqueue(struct ubus_client *cl, struct ubus_msg_buf *ub)
 {
 	struct ubus_msg_buf_list *ubl;
 
 	if (cl->txq_len + sizeof(ub->hdr) + ub->len > UBUS_CLIENT_MAX_TXQ_LEN)
-		return;
+		return false;
 
 	ubl = calloc(1, sizeof(struct ubus_msg_buf_list));
 	if (!ubl)
-		return;
+		return false;
 
 	INIT_LIST_HEAD(&ubl->list);
 	ubl->msg = ubus_msg_ref(ub);
 	if (!ubl->msg) {
 		free(ubl);
-		return;
+		return false;
 	}
 
 	list_add_tail(&ubl->list, &cl->tx_queue);
 	cl->txq_len += ub->len + sizeof(ub->hdr);
+	return true;
 }
 
 /* takes the msgbuf reference */
 void ubus_msg_send(struct ubus_client *cl, struct ubus_msg_buf *ub)
 {
 	ssize_t written;
+	bool partial = false;
 
 	if (ub->hdr.type != UBUS_MSG_MONITOR)
 		ubusd_monitor_message(cl, ub, true);
@@ -185,6 +187,7 @@ void ubus_msg_send(struct ubus_client *cl, struct ubus_msg_buf *ub)
 		if (written >= (ssize_t) (ub->len + sizeof(ub->hdr)))
 			return;
 
+		partial = written > 0;
 		cl->txq_ofs = written;
 		cl->txq_len = -written;
 
@@ -192,5 +195,14 @@ void ubus_msg_send(struct ubus_client *cl, struct ubus_msg_buf *ub)
 		uloop_fd_add(&cl->sock, ULOOP_READ | ULOOP_WRITE | ULOOP_EDGE_TRIGGER);
 	}
 
-	ubus_msg_enqueue(cl, ub);
+	if (ubus_msg_enqueue(cl, ub))
+		return;
+
+	/*
+	 * Dropping a whole message keeps the stream framing intact, but a
+	 * message that is already partially on the wire cannot be completed
+	 * anymore; disconnect the client on the next event.
+	 */
+	if (partial)
+		cl->sock.eof = true;
 }
