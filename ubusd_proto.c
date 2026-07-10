@@ -489,8 +489,7 @@ static int ubusd_handle_add_watch(struct ubus_client *cl, struct ubus_msg_buf *u
 		return UBUS_STATUS_NOT_FOUND;
 	}
 
-	ubus_subscribe(obj, target);
-	return 0;
+	return ubus_subscribe(obj, target);
 }
 
 static int ubusd_handle_remove_watch(struct ubus_client *cl, struct ubus_msg_buf *ub, struct blob_attr **attr)
