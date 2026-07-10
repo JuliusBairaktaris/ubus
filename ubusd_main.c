@@ -27,14 +27,19 @@ static void handle_client_disconnect(struct ubus_client *cl)
 	struct ubus_msg_buf_list *ubl, *ubl2;
 	struct ubus_client_cmd *cmd, *cmd2;
 
-	list_for_each_entry_safe(ubl, ubl2, &cl->tx_queue, list)
-		ubus_msg_list_free(ubl);
-
 	list_for_each_entry_safe(cmd, cmd2, &cl->cmd_queue, list)
 		ubus_client_cmd_free(cmd);
 
 	ubusd_monitor_disconnect(cl);
 	ubusd_proto_free_client(cl);
+
+	/*
+	 * Freeing the client's objects above can queue new messages for the
+	 * disconnecting client itself (e.g. the subscribers-gone notification
+	 * sent by ubus_unsubscribe), so the tx queue must be flushed last.
+	 */
+	list_for_each_entry_safe(ubl, ubl2, &cl->tx_queue, list)
+		ubus_msg_list_free(ubl);
 	if (cl->pending_msg_fd >= 0)
 		close(cl->pending_msg_fd);
 	if (cl->pending_msg)
