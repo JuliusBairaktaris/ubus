@@ -28,7 +28,13 @@ static struct ubus_msg_buf *ubus_msg_ref(struct ubus_msg_buf *ub)
 		if (!new_ub)
 			return NULL;
 		memcpy(&new_ub->hdr, &ub->hdr, sizeof(struct ubus_msghdr));
+		/*
+		 * Transfer fd ownership to the copy: the external message is
+		 * freed right after being queued, which would close the fd
+		 * before the queued copy has sent it.
+		 */
 		new_ub->fd = ub->fd;
+		ub->fd = -1;
 		return new_ub;
 	}
 
