@@ -370,6 +370,9 @@ static int ubusd_handle_invoke(struct ubus_client *cl, struct ubus_msg_buf *ub, 
 
 	ubusd_forward_invoke(cl, obj, method, ub, attr[UBUS_ATTR_DATA]);
 
+	/* the fd now belongs to the forwarded message */
+	ub->fd = -1;
+
 	return -1;
 }
 
