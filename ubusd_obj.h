@@ -55,7 +55,7 @@ struct ubus_object {
 	int (*recv_msg)(struct ubus_client *client, struct ubus_msg_buf *ub,
 			const char *method, struct blob_attr *msg);
 
-	int event_seen;
+	uint32_t event_seen;
 	uint16_t invoke_seq;
 };
 

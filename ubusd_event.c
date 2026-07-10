@@ -21,7 +21,7 @@
 static struct avl_tree patterns;
 static struct ubus_object *event_obj;
 static uint16_t event_seq = 0;
-static int obj_event_seq = 1;
+static uint32_t obj_event_seq = 1;
 
 struct event_source {
 	struct list_head list;
@@ -158,7 +158,9 @@ int ubusd_send_event(struct ubus_client *cl, const char *id,
 	if (ubusd_acl_check(cl, id, NULL, UBUS_ACL_SEND))
 		return UBUS_STATUS_PERMISSION_DENIED;
 
-	obj_event_seq++;
+	/* event_seen == 0 marks objects that never received an event */
+	if (!++obj_event_seq)
+		obj_event_seq = 1;
 
 	/*
 	 * Since this tree is sorted alphabetically, we can only expect to find
