@@ -444,7 +444,7 @@ ubusd_acl_file_add(struct ubusd_acl_file *file)
 		if (pwd)
 			file->uid = pwd->pw_uid;
 		else
-			file->uid = 0;
+			syslog(LOG_ERR, "unknown user %s\n", file->user);
 	} else if (tb[ACL_GROUP]) {
 		struct group *grp;
 
@@ -453,7 +453,7 @@ ubusd_acl_file_add(struct ubusd_acl_file *file)
 		if (grp)
 			file->gid = grp->gr_gid;
 		else
-			file->gid = 0;
+			syslog(LOG_ERR, "unknown group %s\n", file->group);
 	} else {
 		return;
 	}
