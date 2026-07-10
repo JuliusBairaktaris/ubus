@@ -296,32 +296,31 @@ static struct uloop_fd sighup_ufd = {
 	.cb = sighup_fd_cb,
 };
 
-static int mkdir_sockdir()
+/*
+ * Best effort only: the -s option may point somewhere else entirely, and
+ * usock() reports a clear error if the requested socket path is unusable.
+ */
+static void mkdir_sockdir(void)
 {
 	char *ubus_sock_dir, *tmp;
-	int ret = 0;
 
 	ubus_sock_dir = strdup(UBUS_UNIX_SOCKET);
 	if (!ubus_sock_dir)
-		return -1;
+		return;
 
 	tmp = strrchr(ubus_sock_dir, '/');
 	if (tmp) {
 		*tmp = '\0';
-		ret = mkdir(ubus_sock_dir, 0755);
-		if (ret && errno == EEXIST) {
+		if (mkdir(ubus_sock_dir, 0755) && errno == EEXIST) {
 			struct stat st;
 
-			if (stat(ubus_sock_dir, &st) == 0 && S_ISDIR(st.st_mode))
-				ret = 0;
-			else
+			if (stat(ubus_sock_dir, &st) || !S_ISDIR(st.st_mode))
 				fprintf(stderr, "%s exists but is not a directory\n",
 					ubus_sock_dir);
 		}
 	}
 
 	free(ubus_sock_dir);
-	return ret;
 }
 
 #include <libubox/ulog.h>
@@ -372,9 +371,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	ret = mkdir_sockdir();
-	if (ret)
-		goto out;
+	mkdir_sockdir();
 	unlink(ubus_socket);
 	umask(0111);
 	server_fd.fd = usock(USOCK_UNIX | USOCK_SERVER | USOCK_NONBLOCK, ubus_socket, NULL);
