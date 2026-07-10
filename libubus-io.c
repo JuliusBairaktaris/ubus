@@ -102,8 +102,7 @@ static int writev_retry(int fd, struct iovec *iov, int iov_len, int sock_fd)
 			continue;
 		}
 
-		if (len > 0)
-			sock_fd = -1;
+		sock_fd = -1;
 
 		len += cur_len;
 		while (cur_len >= (ssize_t) iov->iov_len) {
