@@ -361,6 +361,8 @@ int ubus_channel_connect(struct ubus_context *ctx, int fd,
 	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0 ||
 	    fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
 		ctx->sock.fd = -1;
+		free(ctx->msgbuf.data);
+		ctx->msgbuf.data = NULL;
 		return -1;
 	}
 
