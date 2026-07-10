@@ -72,6 +72,22 @@ static void ubus_client_cmd_queue_process(struct ubus_client *cl)
 	}
 }
 
+static int ubusd_recv_fd(struct msghdr *msghdr)
+{
+	struct cmsghdr *cmsg;
+
+	for (cmsg = CMSG_FIRSTHDR(msghdr); cmsg; cmsg = CMSG_NXTHDR(msghdr, cmsg)) {
+		if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS)
+			continue;
+		if (cmsg->cmsg_len < CMSG_LEN(sizeof(int)))
+			continue;
+
+		return *(int *) CMSG_DATA(cmsg);
+	}
+
+	return -1;
+}
+
 static void client_cb(struct uloop_fd *sock, unsigned int events)
 {
 	struct ubus_client *cl = container_of(sock, struct ubus_client, sock);
@@ -80,21 +96,9 @@ static void client_cb(struct uloop_fd *sock, unsigned int events)
 	struct ubus_msg_buf *ub;
 	struct ubus_msg_buf_list *ubl, *ubl2;
 	static struct iovec iov;
-	struct cmsghdr *cmsg;
-	int *pfd;
 
-	msghdr.msg_iov = &iov,
-	msghdr.msg_iovlen = 1,
-	msghdr.msg_control = fd_buf;
-	msghdr.msg_controllen = sizeof(fd_buf);
-
-	cmsg = CMSG_FIRSTHDR(&msghdr);
-	cmsg->cmsg_type = SCM_RIGHTS;
-	cmsg->cmsg_level = SOL_SOCKET;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-
-	pfd = (int *) CMSG_DATA(cmsg);
-	msghdr.msg_controllen = cmsg->cmsg_len;
+	msghdr.msg_iov = &iov;
+	msghdr.msg_iovlen = 1;
 
 	/* first try to tx more pending data */
 	list_for_each_entry_safe(ubl, ubl2, &cl->tx_queue, list) {
@@ -140,25 +144,22 @@ retry:
 		int offset = cl->pending_msg_offset;
 		int bytes;
 
-		*pfd = -1;
-
 		iov.iov_base = ((char *) &cl->hdrbuf) + offset;
 		iov.iov_len = sizeof(cl->hdrbuf) - offset;
 
-		if (cl->pending_msg_fd < 0) {
-			msghdr.msg_control = fd_buf;
-			msghdr.msg_controllen = cmsg->cmsg_len;
-		} else {
-			msghdr.msg_control = NULL;
-			msghdr.msg_controllen = 0;
-		}
+		msghdr.msg_control = fd_buf;
+		msghdr.msg_controllen = cl->pending_msg_fd < 0 ? sizeof(fd_buf) : 0;
 
 		bytes = recvmsg(sock->fd, &msghdr, 0);
 		if (bytes < 0)
 			goto out;
 
-		if (*pfd >= 0)
-			cl->pending_msg_fd = *pfd;
+		if (cl->pending_msg_fd < 0) {
+			int fd = ubusd_recv_fd(&msghdr);
+
+			if (fd >= 0)
+				cl->pending_msg_fd = fd;
+		}
 
 		cl->pending_msg_offset += bytes;
 		if (cl->pending_msg_offset < (int) sizeof(cl->hdrbuf))
