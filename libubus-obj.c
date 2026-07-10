@@ -21,6 +21,9 @@ ubus_process_unsubscribe(struct ubus_context *ctx, struct ubus_msghdr *hdr,
 {
 	struct ubus_subscriber *s;
 
+	if (fd >= 0)
+		close(fd);
+
 	if (!obj || !attrbuf[UBUS_ATTR_TARGET])
 		return;
 
@@ -30,24 +33,21 @@ ubus_process_unsubscribe(struct ubus_context *ctx, struct ubus_msghdr *hdr,
 	s = container_of(obj, struct ubus_subscriber, obj);
 	if (s->remove_cb)
 		s->remove_cb(ctx, s, blob_get_u32(attrbuf[UBUS_ATTR_TARGET]));
-
-	if (fd >= 0)
-		close(fd);
 }
 
 static void
 ubus_process_notify(struct ubus_context *ctx, struct ubus_msghdr *hdr,
 		    struct ubus_object *obj, struct blob_attr **attrbuf, int fd)
 {
+	if (fd >= 0)
+		close(fd);
+
 	if (!obj || !attrbuf[UBUS_ATTR_ACTIVE])
 		return;
 
 	obj->has_subscribers = blob_get_u8(attrbuf[UBUS_ATTR_ACTIVE]);
 	if (obj->subscribe_cb)
 		obj->subscribe_cb(ctx, obj);
-
-	if (fd >= 0)
-		close(fd);
 }
 static void
 ubus_process_invoke(struct ubus_context *ctx, struct ubus_msghdr *hdr,
@@ -110,12 +110,15 @@ found:
 
 	ret = handler(ctx, obj, &req, blob_data(attrbuf[UBUS_ATTR_METHOD]),
 		      attrbuf[UBUS_ATTR_DATA]);
-	if (req.req_fd >= 0)
-		close(req.req_fd);
-	if (req.deferred || no_reply)
+	if (req.deferred || no_reply) {
+		if (req.req_fd >= 0)
+			close(req.req_fd);
 		return;
+	}
 
 send:
+	if (req.req_fd >= 0)
+		close(req.req_fd);
 	ubus_complete_deferred_request(ctx, &req, ret);
 }
 
@@ -131,7 +134,7 @@ void __hidden ubus_process_obj_msg(struct ubus_context *ctx, struct ubus_msghdr_
 	void *prev_data = NULL;
 	attrbuf = ubus_parse_msg(buf->data, blob_raw_len(buf->data));
 	if (!attrbuf[UBUS_ATTR_OBJID])
-		return;
+		goto drop;
 
 	objid = blob_get_u32(attrbuf[UBUS_ATTR_OBJID]);
 	obj = avl_find_element(&ctx->objects, &objid, obj, avl);
@@ -147,7 +150,7 @@ void __hidden ubus_process_obj_msg(struct ubus_context *ctx, struct ubus_msghdr_
 		cb = ubus_process_notify;
 		break;
 	default:
-		return;
+		goto drop;
 	}
 
 	if (buf == &ctx->msgbuf) {
@@ -163,6 +166,12 @@ void __hidden ubus_process_obj_msg(struct ubus_context *ctx, struct ubus_msghdr_
 		else
 			buf->data = prev_data;
 	}
+
+	return;
+
+drop:
+	if (fd >= 0)
+		close(fd);
 }
 
 static void ubus_add_object_cb(struct ubus_request *req, int type, struct blob_attr *msg)
