@@ -328,7 +328,7 @@ int ubus_notify(struct ubus_context *ctx, struct ubus_object *obj,
 	int ret;
 
 	ret = __ubus_notify_async(ctx, obj, type, msg, &req, timeout >= 0);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	if (timeout < 0) {
