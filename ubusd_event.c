@@ -216,6 +216,7 @@ ubusd_create_event_from_msg(void *priv, const char *id)
 	blob_buf_init(&b, 0);
 	blob_put_int32(&b, UBUS_ATTR_OBJID, 0);
 	blob_put_string(&b, UBUS_ATTR_METHOD, id);
+	blob_put_int8(&b, UBUS_ATTR_NO_REPLY, true);
 	blob_put(&b, UBUS_ATTR_DATA, blobmsg_data(msg), blobmsg_data_len(msg));
 
 	return ubus_msg_new(b.head, blob_raw_len(b.head), true);
@@ -269,6 +270,7 @@ ubusd_create_object_event_msg(void *priv, const char *id)
 	blob_buf_init(&b, 0);
 	blob_put_int32(&b, UBUS_ATTR_OBJID, 0);
 	blob_put_string(&b, UBUS_ATTR_METHOD, id);
+	blob_put_int8(&b, UBUS_ATTR_NO_REPLY, true);
 	s = blob_nest_start(&b, UBUS_ATTR_DATA);
 	blobmsg_add_u32(&b, "id", obj->id.id);
 	blobmsg_add_string(&b, "path", obj->path.key);

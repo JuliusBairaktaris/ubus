@@ -508,6 +508,7 @@ ubusd_create_sequence_event_msg(void *priv, const char *id)
 	blob_buf_init(&b, 0);
 	blob_put_int32(&b, UBUS_ATTR_OBJID, 0);
 	blob_put_string(&b, UBUS_ATTR_METHOD, id);
+	blob_put_int8(&b, UBUS_ATTR_NO_REPLY, true);
 	s = blob_nest_start(&b, UBUS_ATTR_DATA);
 	blobmsg_add_u32(&b, "sequence", ubusd_acl_seq);
 	blob_nest_end(&b, s);
