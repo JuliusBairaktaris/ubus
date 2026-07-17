@@ -81,8 +81,16 @@ ubus_proto_send_msg_from_blob(struct ubus_client *cl, struct ubus_msg_buf *ub,
 	/* keep the fd to be passed if it is UBUS_MSG_INVOKE */
 	int fd = ub->fd;
 	ub = ubus_reply_from_blob(ub, true);
-	if (!ub)
+	if (!ub) {
+		/*
+		 * The caller hands the fd over to us and clears its own copy, so
+		 * close it here when the reply could not be built; otherwise it
+		 * would be leaked.
+		 */
+		if (fd >= 0)
+			close(fd);
 		return;
+	}
 
 	ub->hdr.type = type;
 	ub->fd = fd;
