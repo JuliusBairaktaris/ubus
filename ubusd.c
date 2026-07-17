@@ -175,6 +175,17 @@ void ubus_msg_send(struct ubus_client *cl, struct ubus_msg_buf *ub)
 	ssize_t written;
 	bool partial = false;
 
+	/*
+	 * Once a message has been left half-written the stream framing is
+	 * broken and the client is flagged for disconnect, which only happens
+	 * when control returns to the event loop. Until then the tx queue is
+	 * empty again, so a further send would take the direct-write branch
+	 * below and splice a fresh message onto the abandoned one, leaving the
+	 * peer to parse garbage. Drop anything queued for a dying client.
+	 */
+	if (cl->sock.eof)
+		return;
+
 	if (ub->hdr.type != UBUS_MSG_MONITOR)
 		ubusd_monitor_message(cl, ub, true);
 
