@@ -22,7 +22,7 @@ static void _ubus_parse_msg(const uint8_t *data, size_t size)
 {
 	struct blob_attr *attr = (struct blob_attr *) data;
 
-	if (size < sizeof(struct blob_attr *))
+	if (size < sizeof(struct blob_attr))
 		return;
 
 	if (blob_pad_len(attr) > UBUS_MAX_MSGLEN)
