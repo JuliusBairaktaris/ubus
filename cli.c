@@ -446,7 +446,13 @@ ubus_cli_get_monitor_data(struct blob_attr *data)
 	int i;
 
 	blob_buf_init(&b, 0);
-	blob_parse(data, tb, policy, UBUS_ATTR_MAX);
+
+	/*
+	 * The monitored payload is captured verbatim from another client's
+	 * traffic, so its nesting is not trustworthy here: parse it with the
+	 * bounds-checked variant rather than blob_parse().
+	 */
+	blob_parse_untrusted(data, blob_raw_len(data), tb, policy, UBUS_ATTR_MAX);
 
 	for (i = 0; i < UBUS_ATTR_MAX; i++) {
 		const char *n = names[i];
