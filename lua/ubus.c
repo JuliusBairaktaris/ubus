@@ -769,11 +769,11 @@ ubus_lua_load_event(lua_State *L)
 
 	event->e.cb = ubus_event_handler;
 
-	/* update the he callback lookup table */
+	/* update the event callback lookup table */
 	lua_getglobal(L, "__ubus_cb_event");
 	lua_pushvalue(L, -2);
 	event->r = luaL_ref(L, -2);
-	lua_setfield(L, -1, lua_tostring(L, -3));
+	lua_pop(L, 1);
 
 	return &event->e;
 }
