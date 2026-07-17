@@ -54,8 +54,16 @@ int __hidden __ubus_start_request(struct ubus_context *ctx, struct ubus_request 
 				struct blob_attr *msg, int cmd, uint32_t peer)
 {
 
-	if (msg && blob_pad_len(msg) > UBUS_MAX_MSGLEN)
+	if (msg && blob_pad_len(msg) > UBUS_MAX_MSGLEN) {
+		/*
+		 * ubus_send_msg() takes ownership of req->fd and closes it on
+		 * every path; bailing out before it runs would otherwise leak
+		 * the caller-supplied fd.
+		 */
+		if (req->fd >= 0)
+			close(req->fd);
 		return -1;
+	}
 
 	INIT_LIST_HEAD(&req->list);
 	INIT_LIST_HEAD(&req->pending);
