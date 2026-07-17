@@ -460,6 +460,15 @@ void ubus_shutdown(struct ubus_context *ctx)
 		ctx->sock.fd = -1;
 	}
 	uloop_timeout_cancel(&ctx->pending_timer);
+
+	while (!list_empty(&ctx->pending)) {
+		struct ubus_pending_msg *pending;
+
+		pending = list_first_entry(&ctx->pending, struct ubus_pending_msg, list);
+		list_del(&pending->list);
+		free(pending);
+	}
+
 	free(ctx->msgbuf.data);
 	ctx->msgbuf.data = NULL;
 }
