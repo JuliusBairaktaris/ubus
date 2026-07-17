@@ -413,7 +413,18 @@ static int ubus_lua_load_methods(lua_State *L, struct ubus_method *m)
 	lua_pushvalue(L, -2);
 	lua_setfield(L, -6, lua_tostring(L, -5));
 
-	m->name = lua_tostring(L, -4);
+	/*
+	 * lua_tostring() returns a pointer into a Lua-managed string; the
+	 * method/object/policy structures outlive the caller's argument table,
+	 * which may be garbage-collected (its strings then freed) long before
+	 * the object is re-registered on reconnect or consulted on an invoke.
+	 * Keep an owned copy.
+	 */
+	m->name = strdup(lua_tostring(L, -4));
+	if (!m->name) {
+		lua_pop(L, 2);
+		return 1;
+	}
 	m->handler = ubus_method_handler;
 
 	plen = lua_gettablelen(L, -1);
@@ -444,7 +455,11 @@ static int ubus_lua_load_methods(lua_State *L, struct ubus_method *m)
 			lua_pop(L, 1);
 			continue;
 		}
-		p[pidx].name = lua_tostring(L, -2);
+		p[pidx].name = strdup(lua_tostring(L, -2));
+		if (!p[pidx].name) {
+			lua_pop(L, 1);
+			continue;
+		}
 		p[pidx].type = val;
 		lua_pop(L, 1);
 		pidx++;
@@ -501,12 +516,18 @@ static struct ubus_object* ubus_lua_load_object(lua_State *L)
 	if (!obj)
 		return NULL;
 
-	obj->o.name = lua_tostring(L, -2);
+	/* owned copy: the Lua key string may be collected before reconnect */
+	obj->o.name = strdup(lua_tostring(L, -2));
+	if (!obj->o.name) {
+		free(obj);
+		return NULL;
+	}
 
 	/* setup method pointers */
 	if (mlen > 0) {
 		m = calloc(mlen, sizeof(struct ubus_method));
 		if (!m) {
+			free((void *) obj->o.name);
 			free(obj);
 			return NULL;
 		}
@@ -517,11 +538,19 @@ static struct ubus_object* ubus_lua_load_object(lua_State *L)
 	obj->o.type = calloc(1, sizeof(struct ubus_object_type));
 	if (!obj->o.type) {
 		free(m);
+		free((void *) obj->o.name);
 		free(obj);
 		return NULL;
 	}
 
-	obj->o.type->name = lua_tostring(L, -2);
+	obj->o.type->name = strdup(lua_tostring(L, -2));
+	if (!obj->o.type->name) {
+		free(obj->o.type);
+		free(m);
+		free((void *) obj->o.name);
+		free(obj);
+		return NULL;
+	}
 	obj->o.type->id = 0;
 	obj->o.type->methods = obj->o.methods;
 
