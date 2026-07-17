@@ -12,7 +12,7 @@
 
 static void _ubus_validate_hdr(const uint8_t *data, size_t size)
 {
-	if (size > sizeof(struct ubus_msghdr))
+	if (size < sizeof(struct ubus_msghdr) + sizeof(struct blob_attr))
 		return;
 
 	ubus_validate_hdr((struct ubus_msghdr *) data);
