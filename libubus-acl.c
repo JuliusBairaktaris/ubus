@@ -22,6 +22,8 @@
 static struct ubus_event_handler acl_event;
 static struct ubus_request acl_req;
 static struct blob_attr *acl_blob;
+static bool acl_query_active;
+static bool acl_query_deferred;
 
 static int acl_cmp(const void *k1, const void *k2, void *ptr)
 {
@@ -128,10 +130,38 @@ static void acl_recv_cb(struct ubus_request *req,
 		acl_add(cur);
 }
 
+static void acl_query(struct ubus_context *ctx);
+
+static void acl_query_complete_cb(struct ubus_request *req, int ret)
+{
+	struct ubus_context *ctx = req->ctx;
+
+	acl_query_active = false;
+	if (!acl_query_deferred)
+		return;
+
+	acl_query_deferred = false;
+	acl_query(ctx);
+}
+
 static void acl_query(struct ubus_context *ctx)
 {
+	/*
+	 * The same static acl_req is reused for every refresh. Starting a new
+	 * query while the previous one is still linked in ctx->requests would
+	 * have ubus_invoke_async() memset() a live list node and corrupt the
+	 * request list. Defer the refresh until the in-flight query completes;
+	 * the deferred run then fetches the latest ACL state.
+	 */
+	if (acl_query_active) {
+		acl_query_deferred = true;
+		return;
+	}
+
+	acl_query_active = true;
 	ubus_invoke_async(ctx, UBUS_SYSTEM_OBJECT_ACL, "query", NULL, &acl_req);
 	acl_req.data_cb = acl_recv_cb;
+	acl_req.complete_cb = acl_query_complete_cb;
 	ubus_complete_request_async(ctx, &acl_req);
 }
 
