@@ -426,8 +426,10 @@ static int ubus_lua_load_methods(lua_State *L, struct ubus_method *m)
 
 	/* setup the policy pointers */
 	p = calloc(plen, sizeof(struct blobmsg_policy));
-	if (!p)
+	if (!p) {
+		lua_pop(L, 2);
 		return 1;
+	}
 
 	m->policy = p;
 	lua_pushnil(L);
